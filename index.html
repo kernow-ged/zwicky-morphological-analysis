@@ -6,11 +6,19 @@
 <meta charset="utf-8" />
 <link rel="stylesheet" href="index.css"  type='text/css' />
 <script type="text/javascript" src="jquery-3.3.1.min.js"></script>
+<script type="text/javascript" src="FileSaver.js"></script>
 <script type="text/javascript">
 'use strict';
 
 var catnames = [];
 var catvalues = [];
+
+var results = [];
+var rejectamenta = [];
+var saved = [];
+
+var resindex = 0;
+var rejindex = 0;
 
 function listCombinations() {
 	var table = $('#combinations2');
@@ -62,21 +70,23 @@ function disallowCombination(button, i, valA, j, valB) {
 };
 
 function appendSolution(resulttable, values) {
-	var html = "<tr>";
+    var result = [];
+    result.push(results.length + 1);
 	for(var i = 0; i < catnames.length; i++) {
-		html += "<td>" + values[i] + "</td>";
+        result.push(values[i]);
 	}
-	html += "</tr>";
-	resulttable.append(html);
+    result.push(""); 
+    results.push(result);
 }
+
 function appendCutNote(resulttable, values, rule, reason) {
-	var html = "<tr>";
+    var reject = [];
+    reject.push(rejectamenta.length + 1); 
 	for(var i = 0; i < catnames.length; i++) {
-		html += "<td class='solutioncut'>" + values[i].join(" ") + "</td>";
+        reject.push(values[i]);
 	}
-	html += "</tr>"
-	html += "<tr><td class='solutioncut solutioncutreason' colspan='" + catnames.length + "'>removed because:" + reason + "</td></tr>";
-	resulttable.append(html);
+    reject.push(reason);
+    rejectamenta.push(reject);
 }
 
 
@@ -235,7 +245,18 @@ function recursiveGenerateSolutions(resulttable, allowedvalues, excludes, depth)
 			recursiveGenerateSolutions(resulttable, newallowedvalues, excludes, depth+1);
 		}
 	}
-	//}
+}
+
+
+function changeDisplayItem(index, identifier){ 
+   var values=[];
+   if(identifier=='result') values=results[index];
+   else values=rejectamenta[index];
+   var html="";
+   for(var i=0; i<values.length; i++) {
+      html += "<td>" + values[i] + "</td>";
+      }
+   document.getElementById(identifier).innerHTML=html;
 }
 
 function generateSolutions() {
@@ -246,14 +267,44 @@ function generateSolutions() {
 	resulttable.find("tr").remove();
 	// fill result table
 	var html = "<tr>";
+    html += "<th class='invariantfield'> Entry </th>";
 	for(var i = 0; i < catnames.length; i++) {
-		html += "<th>" + catnames[i] + "</td>";
+		html += "<th class='category-entry'>" + catnames[i] + "</th>";
 	}
+    html += "<th class='invariantfield'> Notes </th>";
 	html += "</tr>"
+    html += "<tr id='result'></tr>" ;
 	resulttable.append(html);
+ 
+	var rejecttable = $('#rejecttable');
+	var ncol = catnames.length;
+	var excludes = $("#excludes").val().split("\n");
+	// clear result table
+	rejecttable.find("tr").remove();
+	// fill result table
+	var html = "<tr>";
+    html += "<th class='invariantfield-rejects'> Entry </th>";
+	for(var i = 0; i < catnames.length; i++) {
+		html += "<th class='invariantfield-rejects'>" + catnames[i] + "</th>";
+	}
+    html += "<th class='invariantfield-rejects'> Notes </th>";
+	html += "</tr>"
+    html += "<tr id='reject'></tr>" ;
+	rejecttable.append(html);
+    results = [];
+    rejectamenta = [];
+    saved = [];
+    $("#saved").css("display", "none");
 	console.log("generating solutions...");
 	recursiveGenerateSolutions(resulttable, catvalues, excludes, 0);
-	$("#nsolutions").html("" + (resulttable.find("tr").find("td:first").not('.solutioncut').length) + " solutions");
+    document.getElementById('results-indicator').innerHTML="Results (" + results.length + " items)";
+    document.getElementById('rejects-indicator').innerHTML="Rejectamenta (" + rejectamenta.length + " items)";
+    changeDisplayItem(0, 'result');
+    changeDisplayItem(0, 'reject');  
+    resindex = 0;
+    rejindex = 0;
+    $("#respanel").css("display", "block");
+    $("#rejpanel").css("display", "block");   
 }
 
 function clear_inputs(fields) {
@@ -324,6 +375,153 @@ function generateUrl() {
 	return url;
 }
 
+function searchResultsWithCriteria(value) {
+  var criteria = document.getElementById('res-randomcriteria').value.split(" ");
+  for(var i=0; i<criteria.length; i++) {
+      if(criteria[i] == "" || criteria[i] == "*") {}
+	else {
+           if(!value.flat().includes(criteria[i]))
+           return 0;
+      }
+  }
+  return 1;
+}
+
+function searchRejectsWithCriteria(value) {
+  var criteria = document.getElementById('rej-randomcriteria').value.split(" ");
+  for(var i=0; i<criteria.length; i++) {
+      if(criteria[i] == "" || criteria[i] == "*") {}
+	else {
+           if(!value.flat().includes(criteria[i]))
+           return 0;
+      }
+  }
+  return 1;
+}
+
+function goto_rej(input) {  
+	var index = 0;
+	if(isNaN(input)) {
+	  index = 0;
+	  rejindex = 0;
+	}
+	else {
+	  index = Number(input)-1;
+	  if (index <0 || index > rejectamenta.length) {
+	    rejindex = 0;
+	  }
+	  else {
+	  rejindex = index;
+	  }
+	}
+	changeDisplayItem(rejindex, "reject");
+}
+
+
+function goto_res(input) {  
+	var index = 0;
+	if(isNaN(input)) {
+	  index = 0;
+	  resindex = 0;
+	}
+	else {
+	  index = Number(input)-1;
+	  if (index <0 || index > results.length) {
+	    resindex = 0;
+	  }
+	  else {
+	  resindex = index;
+	  }
+	}
+	changeDisplayItem(resindex, "result");
+}
+
+
+function rebuildSavetable() {
+    $("#saved").css("display", "block");   
+    var html = "<table><tr>";
+    html += "<th class='invariantfield'> Entry </th>";
+    for(var i = 0; i < catnames.length; i++) {
+	   html += "<th class='category-entry'>" + catnames[i] + "</th>";
+	  }
+    html += "<th class='invariantfield'> Notes </th>";
+    html += "<th class='invariantfield'> <span id='remove'>Modify</span> </th>";
+    html += "</tr>"
+   for(var j=0; j<saved.length; j++) {
+       html +="<tr>";
+       for (var i=0; i<saved[j].length; i++)  {
+          html +="<td>"  + saved[j][i]  + "</td>";  
+        }
+        html +="<td> <span class='removable' id='remove-" +  j  +   "'>remove</span> | <span class='editable' id='edit-" +  j  +  "'>add/edit note</span></td>";  
+        html +="</tr>"
+    }
+    html +="</table>";
+   document.getElementById('savetable').innerHTML=html;
+   $(document).ready(function () {   
+           $(".removable").click(function () {
+          removeSaved(Number(this.id.substring(7)));
+		});	  
+
+        $(".editable").click(function () {
+          editSaved(Number(this.id.substring(5)));
+		});	
+        
+   });
+}
+
+
+function editSaved(index) {
+  var note = prompt("Add note for entry " + saved[index][0], saved[index][saved[index].length-1]);
+  if (note == null) {} 
+  else {
+    saved[index][saved[index].length-1] = note;
+  } 
+  rebuildSavetable();  
+  changeDisplayItem(resindex, "result"); // update shallow-copied results entry, if it is the same  
+}
+
+function removeSaved(index) {
+    saved.splice(index,1);
+    if(saved.length == 0) {
+       $("#saved").css("display", "none"); 
+    }
+    else {
+       rebuildSavetable();
+    }
+}
+
+function exportCSV(arr, name) {
+   var csv = "Entry,";
+   for(var i=0; i<catnames.length; i++) {
+      csv += catnames[i] + ",";
+   }
+   csv += "Notes"
+   csv +="\n";
+   for(var j=0; j<arr.length; j++) {
+      csv += arr[j][0].toString() + ",";
+      for(var i=1; i<arr[j].length; i++) {
+      var f = arr[j][i].toString();
+      var str = "";
+      if(f.includes(",")) {
+	     str = f;
+         if(f.includes("\"")) {
+	        str = str.replaceAll("\"", "\"\"");
+	     }
+	     str = "\"" + str + "\"";
+         }
+        else {
+          str = f;
+        }
+        if(i == arr[j].length-1) csv += str;
+        else csv += str + ",";
+       }
+     if(j == arr.length-1) {}
+     else csv +="\n";
+    } 
+    var blob = new Blob([csv], {type: "text/csv;charset=utf-8"});
+    saveAs(blob, name + ".csv");
+}
+
 $(window).on('load', function () {
 
 	$(document).ready(function () {
@@ -361,7 +559,7 @@ $(window).on('load', function () {
 			fields[5].value = "hard soft"
 			var exclusions = "green square * | squares are warning shapes\n"
 			exclusions += "* circle hard | ugly\n";
-			exclusions += "* squares soft | squares should be hard warnings\n";
+			exclusions += "* square soft | squares should be hard warnings\n"; // there was a typo here where it said 'squares' instead of 'square'
 			var excludes = $('#excludes');
 			excludes.val(exclusions);
 			$('#btnXLoad').click();
@@ -462,7 +660,102 @@ $(window).on('load', function () {
 			urltextfield.select();
 		});
 		
-		
+		$('#resprev').click(function () {
+            resindex = resindex-1;
+            if(resindex < 0) resindex = results.length-1;
+            changeDisplayItem(resindex, 'result');
+		});		
+        
+ 		$('#resnext').click(function () {
+            resindex = resindex+1;
+            if(resindex >= results.length) resindex = 0;
+            changeDisplayItem(resindex, 'result');
+		});  
+
+ 		$('#rejprev').click(function () {
+            rejindex = rejindex-1;
+            if(rejindex < 0) rejindex = rejectamenta.length-1;
+            changeDisplayItem(rejindex, 'reject');            
+		});		
+        
+ 		$('#rejnext').click(function () {
+            rejindex = rejindex+1;
+            if(rejindex >= rejectamenta.length) rejindex = 0;
+            changeDisplayItem(rejindex, 'reject');           
+		});        
+        
+ 		$('#resrand').click(function () {
+          if(document.getElementById('res-randomcriteria').value !="") {
+              var subarray = results.filter(searchResultsWithCriteria);
+              if(subarray.length > 0) {
+                  var item = subarray[Math.floor(Math.random()*subarray.length)];
+                  resindex = item[0]-1;
+                  changeDisplayItem(resindex, 'result');
+                  return;
+              }
+           }      
+           resindex = Math.floor(Math.random()*results.length);
+           changeDisplayItem(resindex, 'result');           
+		});  
+
+ 		$('#rejrand').click(function () {
+          if(document.getElementById('rej-randomcriteria').value !="") {
+              var subarray = rejectamenta.filter(searchRejectsWithCriteria);
+              if(subarray.length > 0) {
+                  var item = subarray[Math.floor(Math.random()*subarray.length)];
+                  rejindex = item[0]-1;
+                  changeDisplayItem(rejindex, 'reject');
+                  return;
+              }
+           }
+           rejindex = Math.floor(Math.random()*rejectamenta.length);  
+           changeDisplayItem(rejindex, 'reject');              
+		});		
+ 
+ 		$('#resfirst').click(function () {
+           resindex = 0;
+           changeDisplayItem(resindex, 'result');           
+		});  
+
+ 		$('#rejfirst').click(function () {
+           rejindex = 0;  
+           changeDisplayItem(rejindex, 'reject');              
+		});	 
+ 
+ 		$('#resgoto').click(function () {
+           goto_res($("#res-goto-entry").val()); 
+		});  
+
+ 		$('#rejgoto').click(function () {
+           goto_rej($("#rej-goto-entry").val());              
+		});	
+
+        $(document).keyup(function(event) {
+            if ($("#res-goto-entry").is(":focus") && event.key == "Enter") {
+                goto_res($("#res-goto-entry").val());
+            }
+            if ($("#rej-goto-entry").is(":focus") && event.key == "Enter") {
+                goto_rej($("#rej-goto-entry").val());
+            }            
+        });
+ 
+ 		$('#ressave').click(function () {
+            saved.push(results[resindex]);
+            rebuildSavetable();
+		});	  
+ 
+        $('#btnGenCSVSaved').click(function () {
+            exportCSV(saved, 'saved');
+		});	  
+        
+         $('#btnGenCSVResults').click(function () {
+            exportCSV(results, 'results');
+		});	
+
+        $('#btnGenCSVRejectamenta').click(function () {
+            exportCSV(rejectamenta, 'rejectamenta');
+		});	
+      
 		load_from_url();
 		$('#btnXLoad').click();
 	});
@@ -476,7 +769,7 @@ $(window).on('load', function () {
 <a href="https://github.com/JohannesBuchner/zwicky-morphological-analysis/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="forkme_light_background.png" alt="Fork me on GitHub"></a>
 
 <form name="myform" id="myform">
-
+<p><small>(Based on <a href="https://johannesbuchner.github.io/zwicky-morphological-analysis/">https://johannesbuchner.github.io/zwicky-morphological-analysis/</a>)</small></p>
 <div class="step">
 <h3>Step 1: Define Problem Space</h3>
 
@@ -485,16 +778,16 @@ These can be somewhat overlapping.
 Any impossible combinations are excluded in the next step.
 </p>
 
-<p>Insert category name and allowed values (space seperated).</p>
+<p>Insert category name and allowed values (space separated).</p>
 <p><a id="clear" class="fillexample">Clear</a> | 
 <a id="example1" class="fillexample">Load example 1</a> | 
 <a id="example2" class="fillexample">Load example 2</a> |
-<a id="example3" target="_blank" href="https://johannesbuchner.github.io/zwicky-morphological-analysis/#cats=Plan%3Afull_plan%20specific_plan%20routine_specific%20routine_general%20alertplan%3BTraining%3Aco-op%20specific%20base%2Bregular%20base%3BPersonnel%3A11%2B%208-10%205-7%20%3C4%3BEquipment%3Aspecial%20base%20subbase%3BLeadershipLevel%3A4%203%202%201%3BResponseChem%3A80%2510m%2080%2530m%2050%2515m%2050%2530m%20None30m%3BResponseInfo%3A%3C5min%20%3C30min%20%3E30min%3BResponsePeople%3Amany30min%20some15min%20some30min%20None30min&excl=full_plan%20specific%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Afull_plan%20base%2Bregular%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Afull_plan%20base%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aspecific_plan%20base%2Bregular%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aspecific_plan%20base%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aroutine_specific%20base%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aroutine_general%20co-op%20*%20*%20*%20*%20*%20*%20%7C%20Training%20without%20plan%0Aalertplan%20co-op%20*%20*%20*%20*%20*%20*%20%7C%20Training%20without%20plan%0Aalertplan%20specific%20*%20*%20*%20*%20*%20*%20%7C%20Training%20without%20plan%0Afull_plan%20*%20*%20subbase%20*%20*%20*%20*%20%7C%20Equipment%20worse%20than%20plan%0Aspecific_plan%20*%20*%20subbase%20*%20*%20*%20*%20%7C%20Equipment%20worse%20than%20plan%0Aroutine_specific%20*%20*%20subbase%20*%20*%20*%20*%20%7C%20Equipment%20worse%20than%20plan%0Aroutine_general%20*%20*%20special%20*%20*%20*%20*%20%7C%20Plan%20worse%20than%20equipment%0Aalertplan%20*%20*%20special%20*%20*%20*%20*%20%7C%20Plan%20worse%20than%20equipment%0Afull_plan%20*%20*%20*%203%20*%20*%20*%20%7C%20e%0Afull_plan%20*%20*%20*%202%20*%20*%20*%20%7C%20e%0Afull_plan%20*%20*%20*%201%20*%20*%20*%20%7C%20e%0Aspecific_plan%20*%20*%20*%202%20*%20*%20*%20%7C%20e%0Aspecific_plan%20*%20*%20*%201%20*%20*%20*%20%7C%20e%0Aroutine_specific%20*%20*%20*%201%20*%20*%20*%20%7C%20e%0Aroutine_general%20*%20*%20*%20*%2080%2510m%20*%20*%20%7C%20Generic%20response%20is%20slow%2Fineffective%0Aroutine_general%20*%20*%20*%20*%2080%2530m%20*%20*%20%7C%20Generic%20response%20is%20slow%2Fineffective%0Aroutine_general%20*%20*%20*%20*%2050%2515m%20*%20*%20%7C%20Generic%20response%20is%20slow%2Fineffective%0Aalertplan%20*%20*%20*%20*%2080%2510m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aalertplan%20*%20*%20*%20*%2080%2530m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aalertplan%20*%20*%20*%20*%2050%2515m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aalertplan%20*%20*%20*%20*%2050%2530m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aroutine_specific%20*%20*%20*%20*%20*%20%3C5min%20*%20%7C%20Generic%20response%20is%20slow%0Aroutine_general%20*%20*%20*%20*%20*%20%3C5min%20*%20%7C%20Generic%20response%20is%20slow%0Aalertplan%20*%20*%20*%20*%20*%20%3C5min%20*%20%7C%20Alert-only%20is%20ineffective%0A*%20base%2Bregular%20*%20special%20*%20*%20*%20*%20%7C%20cannot%20use%20special%20equipment%20with%20generic%20training%0A*%20base%20*%20special%20*%20*%20*%20*%20%7C%20cannot%20use%20special%20equipment%20with%20generic%20training%0A*%20base%2Bregular%20*%20*%20*%2080%2510m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%2Bregular%20*%20*%20*%2080%2530m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%2Bregular%20*%20*%20*%2050%2515m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%20*%20*%20*%2080%2510m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%20*%20*%20*%2080%2530m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%20*%20*%20*%2050%2515m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20*%2011%2B%20*%202%20*%20*%20*%20%7C%20h%0A*%20*%2011%2B%20*%201%20*%20*%20*%20%7C%20h%0A*%20*%208-10%20*%204%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%205-7%20*%204%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%205-7%20*%203%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%204%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%203%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%202%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%20*%2080%2510m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20%3C4%20*%20*%2080%2530m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20%3C4%20*%20*%2050%2515m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20%3C4%20*%20*%2050%2530m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20*%20base%20*%2080%2510m%20*%20*%20%7C%20generic%20equipment%20does%20not%20allow%20fast%20response%0A*%20*%20*%20base%20*%2080%2530m%20*%20*%20%7C%20generic%20equipment%20does%20not%20allow%20complete%20response%0A*%20*%20*%20subbase%20*%2080%2510m%20*%20*%20%7C%20poor%20equipment%20does%20not%20allow%20complete%20response%0A*%20*%20*%20subbase%20*%2080%2530m%20*%20*%20%7C%20poor%20equipment%20does%20not%20allow%20complete%20response%0A*%20*%20*%20subbase%20*%2050%2515m%20*%20*%20%7C%20poor%20equipment%20does%20not%20allow%20fast%20response%0A">Load example from video</a>
+<a id="example3" target="_blank" href="index.html#cats=Plan%3Afull_plan%20specific_plan%20routine_specific%20routine_general%20alertplan%3BTraining%3Aco-op%20specific%20base%2Bregular%20base%3BPersonnel%3A11%2B%208-10%205-7%20%3C4%3BEquipment%3Aspecial%20base%20subbase%3BLeadershipLevel%3A4%203%202%201%3BResponseChem%3A80%2510m%2080%2530m%2050%2515m%2050%2530m%20None30m%3BResponseInfo%3A%3C5min%20%3C30min%20%3E30min%3BResponsePeople%3Amany30min%20some15min%20some30min%20None30min&excl=full_plan%20specific%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Afull_plan%20base%2Bregular%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Afull_plan%20base%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aspecific_plan%20base%2Bregular%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aspecific_plan%20base%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aroutine_specific%20base%20*%20*%20*%20*%20*%20*%20%7C%20Plan%20not%20completely%20trained%20for%0Aroutine_general%20co-op%20*%20*%20*%20*%20*%20*%20%7C%20Training%20without%20plan%0Aalertplan%20co-op%20*%20*%20*%20*%20*%20*%20%7C%20Training%20without%20plan%0Aalertplan%20specific%20*%20*%20*%20*%20*%20*%20%7C%20Training%20without%20plan%0Afull_plan%20*%20*%20subbase%20*%20*%20*%20*%20%7C%20Equipment%20worse%20than%20plan%0Aspecific_plan%20*%20*%20subbase%20*%20*%20*%20*%20%7C%20Equipment%20worse%20than%20plan%0Aroutine_specific%20*%20*%20subbase%20*%20*%20*%20*%20%7C%20Equipment%20worse%20than%20plan%0Aroutine_general%20*%20*%20special%20*%20*%20*%20*%20%7C%20Plan%20worse%20than%20equipment%0Aalertplan%20*%20*%20special%20*%20*%20*%20*%20%7C%20Plan%20worse%20than%20equipment%0Afull_plan%20*%20*%20*%203%20*%20*%20*%20%7C%20e%0Afull_plan%20*%20*%20*%202%20*%20*%20*%20%7C%20e%0Afull_plan%20*%20*%20*%201%20*%20*%20*%20%7C%20e%0Aspecific_plan%20*%20*%20*%202%20*%20*%20*%20%7C%20e%0Aspecific_plan%20*%20*%20*%201%20*%20*%20*%20%7C%20e%0Aroutine_specific%20*%20*%20*%201%20*%20*%20*%20%7C%20e%0Aroutine_general%20*%20*%20*%20*%2080%2510m%20*%20*%20%7C%20Generic%20response%20is%20slow%2Fineffective%0Aroutine_general%20*%20*%20*%20*%2080%2530m%20*%20*%20%7C%20Generic%20response%20is%20slow%2Fineffective%0Aroutine_general%20*%20*%20*%20*%2050%2515m%20*%20*%20%7C%20Generic%20response%20is%20slow%2Fineffective%0Aalertplan%20*%20*%20*%20*%2080%2510m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aalertplan%20*%20*%20*%20*%2080%2530m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aalertplan%20*%20*%20*%20*%2050%2515m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aalertplan%20*%20*%20*%20*%2050%2530m%20*%20*%20%7C%20Alert-only%20is%20ineffective%0Aroutine_specific%20*%20*%20*%20*%20*%20%3C5min%20*%20%7C%20Generic%20response%20is%20slow%0Aroutine_general%20*%20*%20*%20*%20*%20%3C5min%20*%20%7C%20Generic%20response%20is%20slow%0Aalertplan%20*%20*%20*%20*%20*%20%3C5min%20*%20%7C%20Alert-only%20is%20ineffective%0A*%20base%2Bregular%20*%20special%20*%20*%20*%20*%20%7C%20cannot%20use%20special%20equipment%20with%20generic%20training%0A*%20base%20*%20special%20*%20*%20*%20*%20%7C%20cannot%20use%20special%20equipment%20with%20generic%20training%0A*%20base%2Bregular%20*%20*%20*%2080%2510m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%2Bregular%20*%20*%20*%2080%2530m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%2Bregular%20*%20*%20*%2050%2515m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%20*%20*%20*%2080%2510m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%20*%20*%20*%2080%2530m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20base%20*%20*%20*%2050%2515m%20*%20*%20%7C%20generic%20training%20leads%20to%20slow%20response%0A*%20*%2011%2B%20*%202%20*%20*%20*%20%7C%20h%0A*%20*%2011%2B%20*%201%20*%20*%20*%20%7C%20h%0A*%20*%208-10%20*%204%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%205-7%20*%204%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%205-7%20*%203%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%204%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%203%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%202%20*%20*%20*%20%7C%20number%20unavailable%0A*%20*%20%3C4%20*%20*%2080%2510m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20%3C4%20*%20*%2080%2530m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20%3C4%20*%20*%2050%2515m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20%3C4%20*%20*%2050%2530m%20*%20*%20%7C%20insufficient%20manpower%0A*%20*%20*%20base%20*%2080%2510m%20*%20*%20%7C%20generic%20equipment%20does%20not%20allow%20fast%20response%0A*%20*%20*%20base%20*%2080%2530m%20*%20*%20%7C%20generic%20equipment%20does%20not%20allow%20complete%20response%0A*%20*%20*%20subbase%20*%2080%2510m%20*%20*%20%7C%20poor%20equipment%20does%20not%20allow%20complete%20response%0A*%20*%20*%20subbase%20*%2080%2530m%20*%20*%20%7C%20poor%20equipment%20does%20not%20allow%20complete%20response%0A*%20*%20*%20subbase%20*%2050%2515m%20*%20*%20%7C%20poor%20equipment%20does%20not%20allow%20fast%20response%0A">Load example from video</a>
 </p>
-
+<p><small>(The video in question is <a href="https://www.youtube.com/watch?v=x4zAniSP0FY">this one</a>)</small></p>
 <table id="blacklistgrid">
 <tr id="Row1">
-<th>Category name</th><th>Values (space seperated)</th>
+<th>Category name</th><th>Values (space separated)</th>
 </tr>
 <tr id="Row2">
 <th><input value="Color"/></th><td><input value="green blue red" /></td>
@@ -560,9 +853,31 @@ have been considered.</p>
 <button type="button" id="btnShareUrl">Generate URL to share</button><input id="shareurl"></input>
 
 <div class="result">
-
+<h3 id="results-indicator"></h3>
 <table id="resulttable"></table>
-	
+<div id="respanel" style="display:none">
+<div class="ctrls"><span id='resprev'>prev</span> | <span id='resnext'>next</span> | <span id='resrand'>random</span> | <span id='resfirst'>first</span> |   <span id='resgoto'>goto</span> <input id='res-goto-entry' class='goto' size="3"/> | <span id='ressave'>save</span></div><br/>
+constraints on randomiser <input id='res-randomcriteria' /><br />
+<small>(Syntax: same as for the 'complex excludes' field. For example, given example 2 above, <b>red * *</b> means that the colour must be red but that the other two fields can be random)</small><br />
+<button type="button" id="btnGenCSVResults">Export CSV</button>
+</div>
+
+<div id="saved" style="display:none">
+<h3>Saved entries</h3>
+<div id="savetable"></div>
+<button type="button" id="btnGenCSVSaved">Export CSV</button>
+</div>
+
+
+<h3 id="rejects-indicator"></h3>
+<table id="rejecttable"></table>
+
+<div id="rejpanel" style="display:none">
+<div class="ctrls"><span id='rejprev'>prev</span> | <span id='rejnext'>next</span> | <span id='rejrand'>random</span> | <span id='rejfirst'>first</span> |  <span id='rejgoto'>goto</span> <input id='rej-goto-entry' class='goto' size="3"/></div><br/>
+constraints on randomiser <input id='rej-randomcriteria'/><br />
+<button type="button" id="btnGenCSVRejectamenta">Export CSV</button>
+</div>
+
 </div>
 
 </div>

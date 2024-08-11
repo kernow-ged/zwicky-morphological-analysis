@@ -36,3 +36,38 @@ table td, table th {
 .solutioncut {
   background-color: yellow;
 }
+
+.invariantfield {
+  background-color: #add8e6;
+}
+
+.invariantfield-rejects {
+  background-color: #ffcccb;
+}
+
+.category-entry {
+  background-color: #d3d3d3;     
+}
+
+.ctrls {
+  color: #0000ff; 
+  font-size:90%;  
+}
+
+.removable {
+  color: #0000ff; 
+  font-size:90%;  
+}
+
+.editable {
+  color: #0000ff; 
+  font-size:90%;  
+}
+
+.goto {
+    line-height: 0.5em
+}
+
+#reject {
+  background-color: yellow;
+}
